@@ -1,23 +1,140 @@
-import math
+import numpy
+from numpy import cos,sin, vstack, hstack
 
-from numpy import *
-from transformations import *
+casadiAvailable = False
+casadiTypes = set()
+try:
+  import casadi as c
+  casadiAvailable = True
+  casadiTypes = set([type(c.SX()),type(c.SXMatrix())])
+except ImportError:
+  pass
+  
+def TRx(a):
+  constr = numpy.matrix
+  if casadiAvailable and type(a) in casadiTypes:
+    constr = c.SXMatrix
+  return  constr([[1,0,0,0],[0,cos(a),-sin(a),0],[0,sin(a),cos(a),0],[0,0,0,1]])
 
-def T2R(a):
-  if a.shape[0] == 3:
-    return a
-  else:
-    return a[:3,:3] 
+def TRy(a):
+  constr = numpy.matrix
+  if casadiAvailable and type(a) in casadiTypes:
+    constr = c.SXMatrix
+  return  constr([[cos(a),0,sin(a),0],[0,1,0,0],[-sin(a),0,cos(a),0],[0,0,0,1]])
 
-def inv(a):
-  if a.shape[0] == 3:
-    return a.T
-  else:
-    R = T2R(a).T
-    return vstack((hstack((R,-dot(R,a[:3,3]))),matrix([[0,0,0,1]])))
+def TRz(a):
+  constr = numpy.matrix
+  if casadiAvailable and type(a) in casadiTypes:
+    constr = c.SXMatrix
+  return  constr([[cos(a),-sin(a),0,0],[sin(a),cos(a),0,0],[0,0,1,0],[0,0,0,1]])
 
+def tr(x,y,z):
+  return  numpy.matrix([[1,0,0,x],[0,1,0,y],[0,0,1,z],[0,0,0,1]])
+  
+def Tquat(q0,q1,q2,q3):
+  return R2T(quat(q0,q1,q2,q3))
+  
+def quat(q0,q1,q2,q3):
+  """
+  From Shabana AA. Dynamics of multibody systems. Cambridge Univ Pr; 2005.
+  """
+  constr = numpy.matrix
+  types =  set([type(q) for q in [q0,q1,q2,q3]])
+  #if not(types.isdisjoint(casadiTypes)):
+  #  constr = c.SXMatrix
+    
+  E  = constr([[-q1, q0, -q3, q2],[-q2, q3, q0, -q1],[-q3,-q2,q1,q0]])
+  Eb = constr([[-q1, q0, q3, -q2],[-q2, -q3, q0, q1],[-q3,q2,-q1,q0]])
+  
+  
+  if not(types.isdisjoint(casadiTypes)):
+    constr = c.SXMatrix
+    
+  return constr(numpy.dot(E,Eb.T))
 
-def NotImplemented(*args,**kwargs):
-  raise Exception("Not implemented in kinetics.flatkinematics")
+def fullR(R_0_0,R_1_0,R_2_0, R_0_1, R_1_1, R_2_1, R_0_2, R_1_2, R_2_2):
+  constr = numpy.matrix
+  types =  set([type(q) for q in [R_0_0,R_1_0,R_2_0, R_0_1, R_1_1, R_2_1, R_0_2, R_1_2, R_2_2]])
+  if not(types.isdisjoint(casadiTypes)):
+    constr = c.SXMatrix
+  return constr([[R_0_0,  R_0_1,  R_0_2],[R_1_0,  R_1_1,  R_1_2 ],[R_2_0,  R_2_1,  R_2_2 ]])
+  
+def TfullR(R_0_0,R_1_0,R_2_0, R_0_1, R_1_1, R_2_1, R_0_2, R_1_2, R_2_2):
+  return R2T(fullR(R_0_0,R_1_0,R_2_0, R_0_1, R_1_1, R_2_1, R_0_2, R_1_2, R_2_2))
+  
 
-Tquat  = full   = TfullR = fullR =  NotImplemented
+def origin() :
+  return tr(0,0,0)
+  
+  
+def trp(T):
+  return numpy.matrix(T)[:3,3]
+  
+def inv(T):
+  R=numpy.matrix(T2R(T).T)
+  constr = numpy.matrix
+  if type(T) in casadiTypes:
+    constr = c.SXMatrix
+  return constr(vstack((hstack((R,-numpy.dot(R,trp(T)))),numpy.matrix([0,0,0,1]))))
+
+def skew(vec):
+  x = vec[0]
+  y = vec[1]
+  z = vec[2]
+  return c.SXMatrix([[0,-z,y],[z,0,-x],[-y,x,0]])
+  
+def invskew(S):
+  return c.SXMatrix([S[2,1],S[0,2],S[1,0]])
+  
+def cross(a,b):
+  return c.mul(skew(a),b)
+
+def T2R(T):
+  """
+   Rotational part of transformation matrix 
+   
+  """
+  return T[0:3,0:3]
+  
+def R2T(R):
+  """
+   Pack a rotational matrix in a homogenous form
+   
+  """
+  constr = numpy.matrix
+  if type(R) in casadiTypes:
+    constr = c.SXMatrix
+  T  = constr([[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,1.0]])
+  T[:3,:3] = R
+  return T
+  
+def T2w():
+  """
+   skew(w_100) = T2w(T_10)
+   
+  """
+  
+def T2W(T,p,dp):
+  """
+   w_101 = T2W(T_10,p,dp)
+   
+  """
+  R = T2R(T)
+  dR = c.reshape(c.mul(c.jacobian(R,p),dp),(3,3))
+  return invskew(c.mul(R.T,dR))
+  
+def T2WJ(T,p):
+  """
+   w_101 = T2WJ(T_10,p).diff(p,t)
+   
+  """
+  R = T2R(T)
+  RT = R.T
+  
+  temp = []
+  for i,k in [(2,1),(0,2),(1,0)]:
+     #temp.append(c.mul(c.jacobian(R[:,k],p).T,R[:,i]).T)
+     temp.append(c.mul(RT[i,:],c.jacobian(R[:,k],p)))
+
+  return c.vertcat(temp)
+  
