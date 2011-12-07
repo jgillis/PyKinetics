@@ -1,5 +1,7 @@
 import numpy
-from numpy import cos,sin, vstack, hstack
+from numpy import cos,sin, vstack, hstack, add, prod
+from numpy import *
+from casadi import *
 
 casadiAvailable = False
 casadiTypes = set()
@@ -36,7 +38,36 @@ def Tquat(q0,q1,q2,q3):
   
 def quat(q0,q1,q2,q3):
   """
+  From Jeroen's presentation. q = [e*sin(theta/2); cos(theta/2)]
+  """
+  constr = numpy.array
+  types =  set([type(q) for q in [q0,q1,q2,q3]])
+  #if not(types.isdisjoint(casadiTypes)):
+  #  constr = c.SXMatrix
+
+  rho = constr([[q0],[q1],[q2]])
+  rho_skew = constr([[0, -q2, q1],[q2, 0, -q0],[-q1, q0, 0]])
+  print type(rho), rho.shape, rho
+  print type(rho_skew), rho_skew.shape, rho_skew
+
+  print type(q3*q3), q3*q3
+  print type(numpy.dot(rho.T,rho)), numpy.dot(rho.T,rho)
+  print q3**2-numpy.dot(rho.T,rho)
+  print "hier:", numpy.dot(rho,rho.T)
+
+  I_3 = constr([[1.0,0,0],[0,1.0,0],[0,0,1.0]])
+
+  A = (q3*q3-numpy.dot(rho.T,rho))*I_3+numpy.dot(rho,rho.T)*2.0-rho_skew*q3*2.0
+
+  if not(types.isdisjoint(casadiTypes)):
+    constr = c.SXMatrix
+
+  return constr(A.T)
+
+def quatOld(q0,q1,q2,q3):
+  """
   From Shabana AA. Dynamics of multibody systems. Cambridge Univ Pr; 2005.
+  defined as [ cos(theta/2) e*sin(theta/2) ]
   """
   constr = numpy.matrix
   types =  set([type(q) for q in [q0,q1,q2,q3]])
@@ -81,7 +112,12 @@ def skew(vec):
   x = vec[0]
   y = vec[1]
   z = vec[2]
-  return c.SXMatrix([[0,-z,y],[z,0,-x],[-y,x,0]])
+  constr = numpy.matrix
+  types =  set([type(q) for q in [x,y,z]])
+  if not(types.isdisjoint(casadiTypes)):
+    constr = c.SXMatrix
+
+  return constr([[0,-z,y],[z,0,-x],[-y,x,0]])
   
 def invskew(S):
   return c.SXMatrix([S[2,1],S[0,2],S[1,0]])
@@ -122,7 +158,15 @@ def T2W(T,p,dp):
   R = T2R(T)
   dR = c.reshape(c.mul(c.jacobian(R,p),dp),(3,3))
   return invskew(c.mul(R.T,dR))
-  
+
+def quatDynamics(q0,q1,q2,q3):
+  """
+   dot(q) = quatDynamics(q)*w_101
+   
+  """
+  B = numpy.matrix([[q3,-q2,q1],[q2,q3,-q0],[-q1,q0,q3],[-q0,-q1,-q2]])*0.5
+  return B
+
 def T2WJ(T,p):
   """
    w_101 = T2WJ(T_10,p).diff(p,t)
