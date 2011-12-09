@@ -45,10 +45,9 @@ def quat(q0,q1,q2,q3):
 
   rho = constr([[q0],[q1],[q2]])
   rho_skew = skew(rho)
-
   I_3 = constr([[1.0,0,0],[0,1.0,0],[0,0,1.0]])
 
-  A = multiply(I_3,(q3*q3-numpy.dot(rho.T,rho)))+numpy.dot(rho,rho.T)*2.0-rho_skew*q3*2.0
+  A = multiply(I_3,(numpy.dot(rho.T,-rho)+q3*q3))+numpy.dot(rho,rho.T)*2.0-q3*rho_skew*2.0
 
   if not(types.isdisjoint(casadiTypes)):
     constr = c.SXMatrix
