@@ -31,6 +31,12 @@ def TRz(a):
 def tr(x,y,z):
   return  numpy.matrix([[1,0,0,x],[0,1,0,y],[0,0,1,z],[0,0,0,1]])
   
+def scale(a):
+  return  numpy.matrix([[a,0,0],[0,a,0],[0,0,a]])
+  
+def Tscale(a):
+  return  R2T(scale(a))
+  
 def Tquat(q0,q1,q2,q3):
   return R2T(quat(q0,q1,q2,q3))
   
