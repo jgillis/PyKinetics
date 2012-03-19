@@ -53,11 +53,38 @@ def quat(q0,q1,q2,q3):
   rho_skew = skew(rho)
   I_3 = constr([[1.0,0,0],[0,1.0,0],[0,0,1.0]])
 
-  A = multiply(I_3,(numpy.dot(rho.T,-rho)+q3*q3))+numpy.dot(rho,rho.T)*2.0-q3*rho_skew*2.0
+  #A = multiply(I_3,(numpy.dot(rho.T,-rho)+q3*q3))+numpy.dot(rho,rho.T)*2.0-q3*rho_skew*2.0
+  
+  b = q0
+  c_ = q1
+  d = q2
+  a = q3
+  
+  a2 = a**2
+  b2 = b**2
+  c2 = c_**2
+  d2 = d**2
+
+  am2 = -a2
+  bm2 = -b2
+  cm2 = -c2
+  dm2 = -d2
+  
+  bb = 2*b
+  aa = 2*a
+  
+  bc2 = bb*c_
+  bd2 = bb*d
+  ac2 = aa*c_
+  ab2 = aa*b
+  ad2 = aa*d
+  cd2 = 2*c_*d
+  
+  A = constr([[a2+b2+cm2+dm2,  bc2 - ad2,  bd2  + ac2],[bc2 + ad2, a2+bm2+c2+dm2, cd2 - ab2], [ bd2 -ac2, cd2 + ab2, a2+bm2+cm2+d2]]).T
 
   if not(types.isdisjoint(casadiTypes)):
     constr = c.SXMatrix
-
+  
   return constr(A.T)
 
 def quatOld(q0,q1,q2,q3):
